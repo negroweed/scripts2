@@ -1,12 +1,10 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-set -e
+set -ex
 clear
 
 echo "HyperTN/MIUITN Rom Mod by Thang Nguyen (Based on China ROM)"
 
-structure=$(<META-INF/Structure)
-DeviceCodeRom=$(<META-INF/DeviceCode)
 fastboot_cmd="META-INF/fastboot"
 
 echo "***********************************************"
@@ -27,17 +25,7 @@ echo ""
 echo ""
 echo "***********************************************"
 
-DeviceCodeReal=$($fastboot_cmd getvar product 2>&1 | grep -oP 'product: \K.*')
-slot_count=$($fastboot_cmd getvar slot-count 2>&1 | grep -oP 'slot-count: \K.*')
-fqlx="A"
-[[ "$slot_count" == "2" ]] && fqlx="AB"
-
-[[ "$DeviceCodeReal" == "mars" ]] && DeviceCodeReal="star"
-
-if ! echo "$DeviceCodeReal" | grep -q "^$DeviceCodeRom$"; then
-    echo "Device codename does not match, your device is \"$DeviceCodeReal\". This rom file is for \"$DeviceCodeRom\", please check again."
-    exit 1
-fi
+fqlx="AB"
 
 echo ""
 echo ""
