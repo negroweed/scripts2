@@ -1,90 +1,101 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-set -e
+set -e  # Stop execution if an error occurs
 
-if ! command -v zstd &>/dev/null; then
-    echo "zstd is not installed, installing zstd...."
-    sleep 1
-    pkg update -y && pkg install zstd -y
+# Function to display messages in a formatted way
+function print_message() {
     echo
-    echo "done"
-    sleep 1
+    echo "***********************************************"
+    echo "$1"
+    echo "***********************************************"
+    echo
+}
+
+# Check and install zstd if not available
+if ! command -v zstd &>/dev/null; then
+    echo "zstd not found, installing zstd..."
+    pkg update -y && pkg install zstd -y
+    echo "zstd successfully installed."
 fi
 
+# Replace platform-tools with android-tools if necessary
+if pkg list-installed | grep -q 'platform-tools'; then
+    echo "platform-tools detected, removing..."
+    pkg uninstall platform-tools -y
+    echo "Installing android-tools..."
+    pkg update -y && pkg install -y termux-api android-tools
+elif ! pkg list-installed | grep -q 'android-tools'; then
+    echo "android-tools not found, installing..."
+    pkg update -y && pkg install -y termux-api android-tools
+fi
+
+# Default slot
 slot="AB"
 
 clear
 
-echo "HyperTN/MIUITN Rom Mod by Thang Nguyen (Based on China ROM)"
-echo "***********************************************"
-echo ""
-echo "  1. Make sure your computer's hard drive is more than 15 Gb"
-echo "  2. Please put the phone into Fastboot mode, and then open this script"
-echo "  3. If the flashing fails, please check driver of PC"
-echo ""
-echo "***********************************************"
-echo ""
-echo "  y = Keep data (Update HyperTN/MIUITN)           n = Format data (First install HyperTN/MIUITN)"
-echo ""
+# Display information and instructions to the user
+print_message "HyperTN/MIUITN ROM Mod by Thang Nguyen (Based on China ROM)"
+
+echo "  1. Ensure your computer has at least 15 GB of free storage."
+echo "  2. Put your phone into Fastboot mode before running this script."
+echo "  3. If flashing fails, check your PC drivers."
+echo
+echo "  y = Keep data (Update HyperTN/MIUITN)"
+echo "  n = Format data (First install of HyperTN/MIUITN)"
+echo
 read -p "Your choice {y/n}: " CHOICE
 
-echo ""
-echo "  Please enter your phone into fastboot"
-echo ""
-echo ""
-echo "***********************************************"
+# Additional instructions
+print_message "Put your phone into Fastboot mode"
+echo "Ignore the 'Invalid sparse file format at magic header' message during the flashing process."
+echo "Please wait during the flashing process, do not exit the script."
 
-echo ""
-echo ""
-echo "  Please ignore the prompt 'Invalid sparse file format at magic header'"
-echo "  Please wait during the flashing process, don't exit"
-echo ""
-echo ""
-
+# Extract .new.dat.zst files to .img
 for file in *.new.dat.zst; do
-    par=${file%.new.dat.zst}
-    rm -f "$par.img"
-    echo "  Extracting $par ..."
-    zstd -d "$file" -o "$par.img"
+    base_name="${file%.new.dat.zst}"
+    echo "Extracting $base_name..."
+    zstd -d "$file" -o "$base_name.img"
 done
 
+# Flash firmware
 for file in firmware-update/*; do
-    par=$(basename "$file")
-    par=${par%.*}
+    base_name=$(basename "$file")
+    base_name="${base_name%.*}"
 
-    if [[ "$par" == "cust" ]]; then
-        fastboot flash "$par" "$file"
-        
-    elif [[ "$par" == "preloader_raw" ]]; then
+    if [[ "$base_name" == "cust" ]]; then
+        fastboot flash "$base_name" "$file"
+    elif [[ "$base_name" == "preloader_raw" ]]; then
         for preloader in preloader_a preloader_b preloader1 preloader2; do
             fastboot flash "$preloader" "$file"
         done
-        
     elif [[ "$slot" == "AB" ]]; then
-        fastboot flash "${par}_a" "$file"
-        fastboot flash "${par}_b" "$file"
-        
+        fastboot flash "${base_name}_a" "$file"
+        fastboot flash "${base_name}_b" "$file"
     else
-        fastboot flash "$par" "$file"
-        
+        fastboot flash "$base_name" "$file"
     fi
 done
 
+# Flash super.img if available
 if [[ -f super.img ]]; then
+    echo "Flashing super.img..."
     fastboot flash super super.img
     rm -f super.img
 fi
 
+# Format data if the user's choice is "n"
 if [[ "$CHOICE" == "n" ]]; then
-    echo "  Formatting..."
+    echo "Formatting data..."
     fastboot erase userdata
     fastboot erase metadata
-    echo ""
 fi
 
-echo ""
-echo "  Success, system is restarting..."
-echo ""
+# Set active slot if the device supports AB slots
+if [[ "$slot" == "AB" ]]; then
+    fastboot set_active a
+fi
 
-[[ "$slot" == "AB" ]] && fastboot set_active a
+# Reboot the device
+echo "Process complete, the device will now reboot..."
 fastboot reboot
